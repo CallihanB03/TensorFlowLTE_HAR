@@ -20,11 +20,11 @@ import os
 import json
 import pandas as pd
 
-def load_data(main_data_dir, training=True):
+def load_data(main_data_dir, use_training_data=True):
     """
     Loads data from cbor/json to csv
     """
-    if training:
+    if use_training_data:
         data_dir = main_data_dir + "/training"
     else:
         data_dir = main_data_dir + "/testing"
@@ -51,7 +51,7 @@ def load_data(main_data_dir, training=True):
     return data_dict
 
 
-def __process_cbor_data(data_dict, save_path, save=True):
+def __process_cbor_data(data_dict, save_path, use_training_data, save=True):
     """
     Helper function for loading cbor data into csv
     """
@@ -80,14 +80,13 @@ def __process_cbor_data(data_dict, save_path, save=True):
     print("cbor data was processed successfully")
     print()
 
-    if save:
-        __save_df_to_csv(sensor_data_df, save_path)
-
-
-
+    if save and use_training_data:
+        __save_df_to_csv(sensor_data_df, save_path, use_training_data=True)
+    if save and not use_training_data:
+        __save_df_to_csv(sensor_data_df, save_path, use_training_data=False)
     return sensor_data_df
 
-def __process_json_data(data_dict, save_path, save=True):
+def __process_json_data(data_dict, save_path, use_training_data, save=True):
     """
     Helper function for loading json data into csv
     """
@@ -116,13 +115,18 @@ def __process_json_data(data_dict, save_path, save=True):
     print()
 
     if save:
-        __save_df_to_csv(sensor_data_df, save_path, cbor=False)
+        __save_df_to_csv(sensor_data_df, save_path, use_training_data=use_training_data, cbor=False)
 
-def __save_df_to_csv(df, save_path, cbor=True):
+def __save_df_to_csv(df, save_path, use_training_data, cbor=True):
     if not os.path.exists(save_path):
         os.makedirs(save_path)
         print(f"Creating {save_path}")
         print()
+
+    if use_training_data:
+        save_path += "training_"
+    else:
+        save_path += "testing_"
 
     if cbor:
         save_path += "data_cbor.csv"
@@ -143,18 +147,27 @@ if __name__ == "__main__":
     parser.add_argument('-path_to_data', '--main_data_directory',
                         type=str, required=True, help='Main path to data')
     parser.add_argument('-save_path', '--save_path', type=str, required=False, help='Save path')
+    parser.add_argument('-training', '--training',
+                        type=str, required=False, help="Flag for training data")
     args = parser.parse_args()
 
     input_dir = os.path.basename(args.main_data_directory)
 
-    combined_data_dict = load_data(input_dir)
+    if not args.training or args.training.upper() == "true":
+        combined_data_dict = load_data(input_dir)
+        TRAINING = True
+    else:
+        combined_data_dict = load_data(input_dir, use_training_data=False)
+        TRAINING = False
 
     if not args.save_path:
         args.save_path = "./"
 
     # Building csv for cbor and json data
     if combined_data_dict["cbor"]:
-        __process_cbor_data(combined_data_dict, save_path=args.save_path)
+        __process_cbor_data(combined_data_dict,
+                            use_training_data=TRAINING, save_path=args.save_path)
 
     if combined_data_dict["json"]:
-        __process_json_data(combined_data_dict, save_path=args.save_path)
+        __process_json_data(combined_data_dict,
+                            use_training_data=TRAINING, save_path=args.save_path)
